@@ -104,4 +104,13 @@ public class PCB {
     public int getProcessID() {
         return processID;
     }
+
+    public int getHeldUnits(int resourceID) {
+        for (ResourceAllocatedEntry entry : resources) {
+            if (entry.getResourceID() == resourceID) {
+                return entry.getAllocatedAmount();
+            }
+        }
+        return 0;
+    }
 }

@@ -1,151 +1,164 @@
 import java.util.Scanner;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
 
-public class Main {
+public class main {
+    private static FileWriter outputWriter;
+
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        Manager manager = null;
-        boolean firstSequence = true;
-        boolean firstOutputInLine = true;
+        String outputFile = "output.txt";
 
-        while (scanner.hasNextLine()) {
-            String line = scanner.nextLine().trim();
+        try {
+            Scanner scanner;
 
-            if (line.isEmpty()) {
-                continue;
+            // If input file is provided, read from file.
+            // Otherwise, read from terminal/System.in.
+            if (args.length >= 1) {
+                scanner = new Scanner(new File(args[0]));
+            } else {
+                scanner = new Scanner(System.in);
             }
 
-            String[] parts = line.split("\\s+");
-            String command = parts[0];
+            outputWriter = new FileWriter(outputFile);
 
-            try {
-                if (command.equals("in")) {
-                    if (!firstSequence) {
-                        System.out.println();
-                    }
+            manager manager = null;
+            boolean firstSequence = true;
+            boolean firstOutputInLine = true;
 
-                    manager = new Manager();
-                    firstSequence = false;
-                    firstOutputInLine = true;
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine().trim();
 
-                    printResult(manager.getRunningProcessID(), firstOutputInLine);
-                    firstOutputInLine = false;
+                if (line.isEmpty()) {
                     continue;
                 }
 
-                // if command appears before init, treat as error
-                if (manager == null) {
+                String[] parts = line.split("\\s+");
+                String command = parts[0];
+
+                try {
+                    if (command.equals("in")) {
+                        if (!firstSequence) {
+                            outputWriter.write("\n");
+                            System.out.println();
+                        }
+
+                        manager = new manager();
+                        firstSequence = false;
+                        firstOutputInLine = true;
+
+                        printResult(manager.getRunningProcessID(), firstOutputInLine);
+                        firstOutputInLine = false;
+                        continue;
+                    }
+
+                    if (manager == null) {
+                        throw new IllegalArgumentException();
+                    }
+
+                    switch (command) {
+                        case "cr": {
+                            if (parts.length != 2) throw new IllegalArgumentException();
+
+                            int priority = Integer.parseInt(parts[1]);
+
+                            if (priority < 1 || priority > 2) {
+                                throw new IllegalArgumentException();
+                            }
+
+                            if (!manager.create(priority)) {
+                                throw new IllegalArgumentException();
+                            }
+
+                            printResult(manager.getRunningProcessID(), firstOutputInLine);
+                            firstOutputInLine = false;
+                            break;
+                        }
+
+                        case "de": {
+                            if (parts.length != 2) throw new IllegalArgumentException();
+
+                            int processID = Integer.parseInt(parts[1]);
+
+                            if (!manager.destroy(processID)) {
+                                throw new IllegalArgumentException();
+                            }
+
+                            printResult(manager.getRunningProcessID(), firstOutputInLine);
+                            firstOutputInLine = false;
+                            break;
+                        }
+
+                        case "rq": {
+                            if (parts.length != 3) throw new IllegalArgumentException();
+
+                            int resourceID = Integer.parseInt(parts[1]);
+                            int units = Integer.parseInt(parts[2]);
+
+                            if (!manager.request(resourceID, units)) {
+                                throw new IllegalArgumentException();
+                            }
+
+                            printResult(manager.getRunningProcessID(), firstOutputInLine);
+                            firstOutputInLine = false;
+                            break;
+                        }
+
+                        case "rl": {
+                            if (parts.length != 3) throw new IllegalArgumentException();
+
+                            int resourceID = Integer.parseInt(parts[1]);
+                            int units = Integer.parseInt(parts[2]);
+
+                            if (!manager.release(resourceID, units)) {
+                                throw new IllegalArgumentException();
+                            }
+
+                            printResult(manager.getRunningProcessID(), firstOutputInLine);
+                            firstOutputInLine = false;
+                            break;
+                        }
+
+                        case "to": {
+                            if (parts.length != 1) throw new IllegalArgumentException();
+
+                            manager.timeout();
+
+                            printResult(manager.getRunningProcessID(), firstOutputInLine);
+                            firstOutputInLine = false;
+                            break;
+                        }
+
+                        default:
+                            throw new IllegalArgumentException();
+                    }
+
+                } catch (Exception e) {
                     printResult(-1, firstOutputInLine);
                     firstOutputInLine = false;
-                    continue;
+
+                    // After error, ignore state until next "in"
+                    manager = null;
                 }
-
-                switch (command) {
-                    case "cr": {
-                        if (parts.length != 2) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        int priority = Integer.parseInt(parts[1]);
-                        if (priority < 1 || priority > 2) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        manager.create(priority);
-                        printResult(manager.getRunningProcessID(), firstOutputInLine);
-                        firstOutputInLine = false;
-                        break;
-                    }
-
-                    case "de": {
-                        if (parts.length != 2) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        int processID = Integer.parseInt(parts[1]);
-                        if (processID < 0 || processID >= 16) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        if (!manager.destroy(processID)) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        printResult(manager.getRunningProcessID(), firstOutputInLine);
-                        firstOutputInLine = false;
-                        break;
-                    }
-
-                    case "rq": {
-                        if (parts.length != 3) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        int resourceID = Integer.parseInt(parts[1]);
-                        int units = Integer.parseInt(parts[2]);
-
-                        if (resourceID < 0 || resourceID >= 4 || units <= 0) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        if (!manager.request(resourceID, units)) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        printResult(manager.getRunningProcessID(), firstOutputInLine);
-                        firstOutputInLine = false;
-                        break;
-                    }
-
-                    case "rl": {
-                        if (parts.length != 3) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        int resourceID = Integer.parseInt(parts[1]);
-                        int units = Integer.parseInt(parts[2]);
-
-                        if (resourceID < 0 || resourceID >= 4 || units <= 0) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        if (!manager.release(resourceID, units)) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        printResult(manager.getRunningProcessID(), firstOutputInLine);
-                        firstOutputInLine = false;
-                        break;
-                    }
-
-                    case "to": {
-                        if (parts.length != 1) {
-                            throw new IllegalArgumentException();
-                        }
-
-                        manager.timeout();
-                        printResult(manager.getRunningProcessID(), firstOutputInLine);
-                        firstOutputInLine = false;
-                        break;
-                    }
-
-                    default:
-                        throw new IllegalArgumentException();
-                }
-            } catch (Exception e) {
-                printResult(-1, firstOutputInLine);
-                firstOutputInLine = false;
-                manager = null; // next valid command should be "in"
             }
-        }
 
-        System.out.println();
-        scanner.close();
+            outputWriter.write("\n");
+            outputWriter.close();
+            scanner.close();
+
+        } catch (IOException e) {
+            System.err.println("Error: " + e.getMessage());
+        }
     }
 
-    private static void printResult(int value, boolean firstOutputInLine) {
+    private static void printResult(int value, boolean firstOutputInLine) throws IOException {
         if (!firstOutputInLine) {
             System.out.print(" ");
+            outputWriter.write(" ");
         }
+
         System.out.print(value);
+        outputWriter.write(String.valueOf(value));
     }
 }

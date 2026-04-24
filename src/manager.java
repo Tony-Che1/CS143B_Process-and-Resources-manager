@@ -1,12 +1,12 @@
 import java.util.LinkedList;
 
-public class Manager {
+public class manager {
     private PCB runningProcess;
     private PCB[] PCBList;
     private RCB[] RCBList;
     private RL RL;
 
-    public Manager() {
+    public manager() {
         init();
     }
 
@@ -24,7 +24,7 @@ public class Manager {
         RL.addProcess(0, 0); // add process 0 to ready list with priority 0
     }
 
-    public void create(int priority) {
+    public boolean create(int priority) {
         boolean created = false;
         for (int i = 0; i < 16; i++) {
             if (PCBList[i] == null) {
@@ -42,40 +42,46 @@ public class Manager {
             System.out.println("process creation failed: max process limit reached.");
         }
         scheduler();
+        return created;
     }
 
-    public void destroy(int processID) {
+    public boolean destroy(int processID) {
         // Destroy the process with processID and all its children recursively
         if (processID == runningProcess.getProcessID()) {
             System.out.println("destroy failed: cannot destroy the running process.");
-            return;
+            return false;
         }
         if (processID < 0 || processID >= PCBList.length || PCBList[processID] == null) {
             System.out.println("destroy failed: invalid process ID.");
-            return;
+            return false;
         }
         if (!isDescendant(runningProcess.getProcessID(), processID)) {
             System.out.println("destroy failed: process " + processID + "is not a descendant of the running process.");
-            return;
+            return false;
         } 
         int processDestroyed = destroyChildrenProcesses(processID); // destroy all children processes recursively
         System.out.println(processDestroyed + " processes destroyed");
         scheduler(); // schedule after destroying process
+        return true;
     }
 
-    public void request(int resourceID, int requestAmount) {
+    public boolean request(int resourceID, int requestAmount) {
         // Check if the resource is available
         if (resourceID < 0 || resourceID >= RCBList.length) {
             System.out.println("request failed: invalid resource ID.");
-            return;
+            return false;
         }
         if (requestAmount <= 0) {
             System.out.println("request failed: request amount must be positive.");
-            return;
+            return false;
         }
         if (!RCBList[resourceID].isValidRequest(requestAmount)) {
             System.out.println("request failed: request exceeds resource inventory.");
-            return;
+            return false;
+        }
+        int held = runningProcess.getHeldUnits(resourceID);
+        if (held + requestAmount > RCBList[resourceID].getInventory()) {
+            return false;
         }
         if (RCBList[resourceID].isAvailable(requestAmount)) {
             RCBList[resourceID].setAllocated(requestAmount); // allocate resource
@@ -89,21 +95,22 @@ public class Manager {
             System.out.println("process " + runningProcess.getProcessID() + " blocked");
             scheduler();
         }
+        return true;
     }
 
-    public void release(int resourceID, int releasedAmount){
+    public boolean release(int resourceID, int releasedAmount){
         // Release the resource and check if there are waiting processes
         if (resourceID < 0 || resourceID >= RCBList.length) {
             System.out.println("release failed: invalid resource ID.");
-            return;
+            return false;
         }
         if (releasedAmount <= 0) {
             System.out.println("release failed: release amount must be positive.");
-            return;
+            return false    ;
         }
         if (!runningProcess.hasEnoughResource(resourceID, releasedAmount)) {
             System.out.println("release failed: process does not hold enough of resource " + resourceID + ".");
-            return;
+            return false;
         }
         runningProcess.releaseResource(resourceID, releasedAmount); // release resource from process's allocated list
         RCBList[resourceID].setFree(releasedAmount); // increase available units in RCB
@@ -115,6 +122,7 @@ public class Manager {
         }
         System.out.println("resource " + resourceID + " released");
         scheduler();
+        return true;
     }
 
     public void timeout() {
@@ -132,6 +140,10 @@ public class Manager {
         } else {
             System.out.println("no ready process to run.");
         }
+    }
+
+    public int getRunningProcessID() {
+        return runningProcess.getProcessID();
     }
 
     // Helper method to release all resources allocated to a process (used in destroy)
@@ -175,6 +187,7 @@ public class Manager {
         if (parentID != -1) PCBList[parentID].removeChild(processID);
         RL.removeProcess(processID, PCBList[processID].getPriority());
         releaseAllResources(processID);
+        removeFromAllWaitingLists(processID); // remove the blocked process from all waiting lists in RCBs
         PCBList[processID] = null;
         return count + 1;
     }
@@ -188,5 +201,11 @@ public class Manager {
             }
         }
         return false;
+    }
+
+    private void removeFromAllWaitingLists(int processID) {
+        for (int i = 0; i < RCBList.length; i++) {
+            RCBList[i].removeFromWaitingList(processID);
+        }
     }
 }

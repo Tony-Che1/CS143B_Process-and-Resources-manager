@@ -11,6 +11,10 @@ public class RCB {
         WaitingList = new LinkedList<>();
     }
 
+    public void removeFromWaitingList(int processID) {
+        WaitingList.removeIf(entry -> entry.getProcessID() == processID);
+    }
+
     public void addProcessToWaitingList(int processID, int requestAmount) {
         WaitingEntry entry = new WaitingEntry(processID, requestAmount);
         WaitingList.add(entry);
